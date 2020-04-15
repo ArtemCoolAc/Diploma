@@ -1,14 +1,33 @@
+import csv
+import copy
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+
+def labeling(rects, labels, values, annotation):
+    """Attach a text label above each bar in *rects*, displaying its height."""
+    x = np.arange(len(labels))
+    fig, ax = plt.subplots()
+    rect = ax.bar(x, values, 0.9, label='Б16-503 I')
+    # ax.set_title('Средняя успеваемость студентов {}, {} семестр'.format(group_name, term))
+    ax.set_title(annotation)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    fig.autofmt_xdate()
+    for rect in rects:
+        height = rect.get_height()
+        ax.annotate('{}'.format(height),
+                    xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+
 def analyze_one_term(group_name='Б16-503', term=1):
-    import csv
-    import copy
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
-    name = 'svodSession{}({}).csv'.format(group_name, term)
+
+    name = 'svod/svodSession{}({}).csv'.format(group_name, term)
 
     file = open(name, 'r')
-    for i in range(4):
+    for i in range(4): # deleting 4 first not necessary strings
         file.readline()
     reader = csv.reader(file, delimiter=',')  # read CSV
     session = list()
@@ -120,15 +139,13 @@ def analyze_one_term(group_name='Б16-503', term=1):
                         ha='center', va='bottom')
 
     autolabel(rect)
+    fig.set_size_inches(14,8)
+    plt.savefig('graphs/Средняя успеваемость студентов {}, {} семестр'.format(group_name, term), dpi=114)
     return data_new
 
 
 def analyze_all_terms(group_name='Б16-503'):
-    import csv
-    import copy
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    import numpy as np
+
     common = list()
     for i in range(6): 
         data = analyze_one_term('Б16-503', i+1) 
@@ -165,4 +182,6 @@ def analyze_all_terms(group_name='Б16-503'):
                         ha='center', va='bottom')
 
     autolabel(rect)
-
+    fig.set_size_inches(14,8)
+    plt.savefig('graphs/Средняя успеваемость студентов {}, за семестры'.format(group_name), dpi=114)
+    # print(common)

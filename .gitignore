@@ -2,3 +2,4 @@ diplom/
 *.pyc
 *.swo
 *.swp
+.vscode/
