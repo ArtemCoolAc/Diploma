@@ -5,24 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import json
+import os
 
-def labeling(rects, labels, values, annotation):
-    """Attach a text label above each bar in *rects*, displaying its height."""
-    x = np.arange(len(labels))
-    fig, ax = plt.subplots()
-    rect = ax.bar(x, values, 0.9, label='Б16-503 I')
-    # ax.set_title('Средняя успеваемость студентов {}, {} семестр'.format(group_name, term))
-    ax.set_title(annotation)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    fig.autofmt_xdate()
-    for rect in rects:
-        height = rect.get_height()
-        ax.annotate('{}'.format(height),
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom')
 
 def analyze_one_term(group_name='Б16-503', term=1):
 
@@ -39,12 +23,7 @@ def analyze_one_term(group_name='Б16-503', term=1):
         (line[-3] != 'а' or line[-1] != ''):  # * means that the subject wasn't chosen
             session.append(line)  # read session in a huge list
 
-    # session.pop() # pop extra unnesessary data
     session.pop(0)
-
-    #for line in session:
-    #    if 'отч' not in line:
-    #        line[2] = line[2][:-1]  # delete last \n
 
     mapping = {'A': '5', 'B': '4', 'C': '4', 'D': '4', 'E': '3', '': '0', 'н/а': '0'}  # ECTS to mark
     extra_mapping = {'н/а': '0'}
@@ -133,10 +112,8 @@ def analyze_one_term(group_name='Б16-503', term=1):
         for key2, value2 in value.items():
             if key2 != 'lists':
                 data[key][key2] = value2
-    # data.pop('sFamIO')
     data_new = copy.deepcopy(data)
     for key, value in data_new.items():
-        # print(value)
         if '' in value['ECTS']:
             value['ECTS'] = list(filter(lambda a: a != '', value['ECTS']))
         if 'а' in value['mark']:
@@ -144,13 +121,7 @@ def analyze_one_term(group_name='Б16-503', term=1):
         if '' in value['mark']:
             for i in range(len(value['mark'])):
                 value['mark'][i] = '0'
-        # print('ФАМИЛИЯ : {}'.format(key))
-        # print(value)
         value['mark'] = list(map(int, value['mark']))
-
-    # for key, value in data_new.items():
-    #   ...:     mean_marks.push((key, ))
-
 
     with open(f'dicts/__Grades_dict{group_name}_{term}.txt', 'w') as file1:
         file1.write(str(data_new))
@@ -158,63 +129,72 @@ def analyze_one_term(group_name='Б16-503', term=1):
     with open(f'jsons/Grades_json{group_name}_{term}.json', 'w') as file2:
         json.dump(data_new, file2, ensure_ascii=False)
 
-    mean_marks = list()
-    for key, value in data_new.items():
-        mean_marks.append((key, sum(value['mark']) / len(value['mark'])))
-    labels = list(data_new.keys())
-    values = [round(elem[1], 3) for elem in mean_marks]
-    x = np.arange(len(labels))
-    fig, ax = plt.subplots()
-    rect = ax.bar(x, values, 0.9, label='Б16-503 I')
-    ax.set_title('Средняя успеваемость студентов {}, {} семестр'.format(group_name, term))
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    fig.autofmt_xdate()
-
-    # fig.xticks(x, labels, rotation='vertical')
-
-    def autolabel(rects):
-        """Attach a text label above each bar in *rects*, displaying its height."""
-        for rect in rects:
-            height = rect.get_height()
-            ax.annotate('{}'.format(height),
-                        xy=(rect.get_x() + rect.get_width() / 2, height),
-                        xytext=(0, 3),  # 3 points vertical offset
-                        textcoords="offset points",
-                        ha='center', va='bottom')
-
-    autolabel(rect)
-    fig.set_size_inches(14,8)
-    plt.savefig('new_graphs/Средняя успеваемость студентов {}, {} семестр'.format(group_name, term), dpi=114)
     return data_new
 
 
-def analyze_all_terms(group_name='Б16-503', first=0, last=6):
+def draw_graph(group_name, term, feature='mark'):
+    check_file = os.path.exists(f'jsons/Grades_json{group_name}_{term}.json')
+    if check_file:
+        label_feature = 'Успеваемость' if feature == 'mark' else 'ECTS'
+        true_key = '100_average' if feature == 'ECTS' else 'average'
+        with open(f'jsons/Grades_json{group_name}_{term}.json') as file:
+            data_new = json.load(file)
+        mean_marks = list()
+        for key, value in data_new.items():
+            mean_marks.append(value[true_key])
+        labels = list(data_new.keys())
+        bar_label = f'{group_name} {term}'
+        values = [round(elem, 3) for elem in mean_marks]
+        title = f'{label_feature} студентов {group_name}, {term} семестр'
 
-    common = list()
-    for i in range(first, last): 
-        data = analyze_one_term(group_name, i+1) 
-        common.append(data) 
-    terms = [1,2,3,4,5,6]
-    common_mean_values = list()
-    for elem in common: 
-        i = 1 
-        mean_marks = list() 
-        for key, value in elem.items(): 
-            mean_marks.append(sum(value['mark'])/len(value['mark'])) 
-        common_mean_values.append(sum(mean_marks)/len(mean_marks))
-    
-    labels = terms
-    values = [round(elem, 3) for elem in common_mean_values]
+        draw_and_save(title, bar_label, labels, values, 'new')
+
+
+def draw_total_graphs(group_name='Б16-503', feature='mark', first=0, last=6):
+    features = ['mark', 'retake', 'ECTS']
+    title_feature = 'Успеваемость' if feature == 'mark' else ('Пересдачи' if feature == 'retake' else 'ECTS')
+    if feature in features:
+        terms = [num + 1 for num in range(first, last)]
+        # average_values = dict.fromkeys(terms, [])
+        average_values = {key: [] for key in terms}
+        for term in terms:
+            check_file = os.path.exists(f'jsons/Grades_json{group_name}_{term}.json')
+            if check_file:
+                with open(f'jsons/Grades_json{group_name}_{term}.json') as file:
+                    j = json.load(file)
+                for key, value in j.items():
+                    if feature == 'mark':
+                        average_values[term].append(value['average'])
+                    elif feature == 'retake':
+                        average_values[term].append(
+                            len(value['pretest_retake']) + len(value['exam_retake']) + len(value['CP_retake'])
+                        )
+                    elif feature == 'ECTS':
+                        average_values[term].append(value['100_average'])
+
+        values = []
+        for term in terms:
+            if len(average_values[term]) > 0: 
+                values.append(round(sum(average_values[term]) / len(average_values[term]), 3))
+            elif len(average_values[term]) == 0:
+                values.append(0)
+        
+        labels = terms
+        bar_label = f'{group_name} {term}'
+        title = f'{title_feature} студентов {group_name}, за семестры'.format(group_name)
+
+        draw_and_save(title, bar_label, labels, values, 'total')
+        return values
+
+
+def draw_and_save(title, bar_label, labels, values, directory):
     x = np.arange(len(labels))
     fig, ax = plt.subplots()
-    rect = ax.bar(x, values, 0.9, label='Б16-503 I')
-    ax.set_title('Средняя успеваемость студентов {}, за семестры'.format(group_name))
+    rect = ax.bar(x, values, 0.9, label=bar_label)
+    ax.set_title(title)
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     fig.autofmt_xdate()
-
-    # fig.xticks(x, labels, rotation='vertical')
 
     def autolabel(rects):
         """Attach a text label above each bar in *rects*, displaying its height."""
@@ -228,9 +208,39 @@ def analyze_all_terms(group_name='Б16-503', first=0, last=6):
 
     autolabel(rect)
     fig.set_size_inches(14,8)
-    plt.savefig('graphs/Средняя успеваемость студентов {}, за семестры'.format(group_name), dpi=114)
-    # print(common)
+    plt.savefig(f'{directory}_graphs/{title}', dpi=114)    
+
+
+def draw_overall_graphs():
+    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    features = ['mark', 'retake', 'ECTS']
+    labels = [a + 1 for a in range(6)]
+    # overall_stat = dict.fromkeys(features)
+    overall_stat = {key: [] for key in features}
+    for feature in features:
+        average_values = list()
+        for group in groups:
+            values = draw_total_graphs(group, feature)
+            average_values.append(values)
+        values_matrix = np.matrix(average_values)
+        terms_values = values_matrix.T.tolist()
+        overall_stat[feature] = [round(sum(elem) / len(list(filter(lambda x: x != 0, elem))), 3) for elem in terms_values]
+        title_feature = 'Успеваемость студентов 12 кафедры за семестры' if feature == 'mark' \
+             else ('Среднее количество пересдач студентов 12 кафедры' if feature == 'retake' \
+             else 'Среднее значение ECTS студентов 12 кафедры за семестры')
+        draw_and_save(title_feature, '', labels, overall_stat[feature], 'total')
+    with open('Overall_statistics.json', 'w') as file:
+        json.dump(overall_stat, file, ensure_ascii=False)
+
+
+def draw_all_terms_in_groups():
+    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    terms = [a + 1 for a in range(6)]
+    features = ['mark', 'ECTS']
+    for group in groups:
+        for term in terms:
+            for feature in features:
+                draw_graph(group, term, feature)
 
 if __name__ == '__main__':
-    # analyze_all_terms()
-    analyze_one_term('Б16-513', 1)
+    draw_overall_graphs()
