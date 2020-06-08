@@ -102,6 +102,7 @@ def analyze_one_term(group_name='Б16-503', term=1):
             true_length = subjects_number[term] if len(marks_list) else len(marks_list)
             true_length = 10 if term == 5 and 'Б14' in group_name else true_length
             true_length = 8 if term == 6 and 'Б13' in group_name else true_length
+            true_length = 11 if term == 4 and 'Б13' in group_name else true_length
             true_length = 9 if term == 4 and 'Б12' in group_name else true_length
             local['average'] = round(sum(map(int, marks_list)) / true_length, 2)
             local['100_average'] = round(sum(local['100']) / true_length)

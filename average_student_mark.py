@@ -19,7 +19,7 @@ def average_student_mark_learning_and_testing(rs=7, outfile=None):
     solver='sgd', hidden_layer_sizes=(40,)).fit(X_train, y_train)
     predicted = regr.predict(X_test)
     if outfile is not None:
-        save_result_to_file(X_test, predicted, y_test, outfile, regr.score())
+        save_result_to_file(X_test, predicted, y_test, outfile, regr.score(X_test, y_test))
     return predicted, X_test, y_test, regr
 
 
@@ -31,7 +31,7 @@ def save_result_to_file(X_test, predicted, y_test, file_name, score):
         writer.writerow(['1T', '2T', '3T', '4T', '5T', 'predicted', '6Real'])
         for line in diff:
             writer.writerow([*line[0], line[1], line[2][0]])
-        writer.writerow(f'R^2 is {score}')
+        file.write(f'R^2 is {score}')
 
 
 if __name__ == '__main__':

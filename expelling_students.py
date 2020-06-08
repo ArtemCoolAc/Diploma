@@ -7,6 +7,7 @@ import random
 import graphviz
 from new_transform_from_EIS import all_groups
 import os
+import csv
 
 
 def expelling_students_create_and_learn():
@@ -26,16 +27,18 @@ def expelling_students_create_and_learn():
     return predicted, y_test, classifier.score(X_test, y_test)
 
 
-def expelling_students_tree_learn(maximum_depth=None):
+def expelling_students_tree_learn(rs=5, outfile=None, maximum_depth=None):
     groups = all_groups()
     j1 = merge_preliminary_data(groups)
     j2 = correct_dataset(j1)
     dataset = numpy.matrix([elem for elem in j2.values()])
     dataset = dataset.T
     x,y = dataset[:4].T, dataset[4].T
-    X_train, X_test, y_train, y_test = train_test_split(x,y, random_state=random.randint(1,42))
+    X_train, X_test, y_train, y_test = train_test_split(x,y, random_state=rs)
     tree = DecisionTreeClassifier(max_depth=maximum_depth).fit(X_train, y_train)
     predicted = tree.predict(X_test)
+    if outfile is not None:
+        save_result_to_file(X_test, predicted, y_test, outfile, tree.score(X_test, y_test))
     return predicted, X_test, y_test, tree
     #score = cross_val_score(tree, x,y, cv=23)
     #print(score.mean(), score.std())
@@ -43,9 +46,20 @@ def expelling_students_tree_learn(maximum_depth=None):
     #print(score)
 
 
-def visualize_decision_tree(max_depth=3):
+def save_result_to_file(X_test, predicted, y_test, file_name, score):
+    with open(file_name, 'w') as file:
+        writer = csv.writer(file)
+        diff = [(x, pred, y) for x, pred, y in 
+        zip(X_test.tolist(), predicted.tolist(), y_test.tolist())]
+        writer.writerow(['pretest_retake', 'exam_retake', 'average_mark', 'extra', 'predicted', 'label'])
+        for line in diff:
+            writer.writerow([*line[0], line[1], line[2][0]])
+        writer.writerow(f'Accuracy is {score}') 
+
+
+def visualize_decision_tree(rs=5, max_depth=3):
     name = 'Wounderful_tree.dot' if max_depth == 3 else 'Depth_tree.dot'
-    predicted, X_test, y_test, tree = expelling_students_tree_learn(maximum_depth=max_depth)
+    predicted, X_test, y_test, tree = expelling_students_tree_learn(rs=rs, maximum_depth=max_depth)
     dot_data = export_graphviz(tree, out_file=None, 
         feature_names=['pretest', 'exam', 'mean_mark', 'extra_terms'], filled=True,
         rounded=True, special_characters=True, class_names=['False', 'True']) 
@@ -57,8 +71,9 @@ def visualize_decision_tree(max_depth=3):
 
 if __name__ == '__main__':
     scores = []
-    for i in range(50):
-        predicted, X_test, y_test, tree = expelling_students_tree_learn()
+    a = [b for b in range(43)]
+    for i in range(43):
+        predicted, X_test, y_test, tree = expelling_students_tree_learn(rs=a[i])
         scores.append(tree.score(X_test, y_test))
     print(scores)
     print(sum(sorted(scores)[5:])/(len(scores)-5))
