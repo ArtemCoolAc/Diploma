@@ -12,6 +12,14 @@ def get_groups():
             [('Б16-503', '2016'), ('Б16-503', '2017'), ('Б16-503', '2018')],
             [('Б16-513', '2016'), ('Б16-513', '2017'), ('Б16-513', '2018')]]
 
+def get_old_groups():
+    return [[('К01-121', '2012'), ('К03-121', '2013'), ('К05-121', '2014')],
+            [('К01-122', '2012'), ('К03-122', '2013'), ('К05-122', '2014')],
+            [('К01-123', '2012'), ('К03-123', '2013'), ('К05-123', '2014')],
+            [('К01-121', '2013'), ('К03-121', '2014'), ('К05-121', '2015')],
+            [('К01-122', '2013'), ('К03-122', '2014'), ('К05-122', '2015')],
+            [('К01-123', '2013'), ('К03-123', '2014'), ('К05-123', '2015')]]
+
 
 
 def run_browser():
@@ -22,7 +30,8 @@ def run_browser():
 def make_automatic_download(browser):
     groups = get_groups()
     for full_group_data in groups:
-        true_name = full_group_data[-1][0]
+        true_name = full_group_data[-1][0] if full_group_data[-1][0][0] == 'Б' else \
+            f'Б{full_group_data[0][1][-2:]}-50{2+int(full_group_data[0][0][-1])}'
         for idx, group_data in enumerate(full_group_data):
             group = group_data[0]
             year = group_data[1]

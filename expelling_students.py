@@ -5,10 +5,13 @@ from sklearn.model_selection import train_test_split, cross_val_score
 import numpy
 import random
 import graphviz
+from new_transform_from_EIS import all_groups
+import os
 
 
 def expelling_students_create_and_learn():
-    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    # groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    groups = all_groups()
     j1 = merge_preliminary_data(groups)
     j2 = correct_dataset(j1)
     dataset = numpy.matrix([elem for elem in j2.values()])
@@ -24,7 +27,7 @@ def expelling_students_create_and_learn():
 
 
 def expelling_students_tree_learn(maximum_depth=None):
-    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    groups = all_groups()
     j1 = merge_preliminary_data(groups)
     j2 = correct_dataset(j1)
     dataset = numpy.matrix([elem for elem in j2.values()])
@@ -41,19 +44,21 @@ def expelling_students_tree_learn(maximum_depth=None):
 
 
 def visualize_decision_tree(max_depth=3):
+    name = 'Wounderful_tree.dot' if max_depth == 3 else 'Depth_tree.dot'
     predicted, X_test, y_test, tree = expelling_students_tree_learn(maximum_depth=max_depth)
     dot_data = export_graphviz(tree, out_file=None, 
         feature_names=['pretest', 'exam', 'mean_mark', 'extra_terms'], filled=True,
         rounded=True, special_characters=True, class_names=['False', 'True']) 
     graph = graphviz.Source(dot_data)
-    graph.save('Nice_tree.dot')
+    graph.save(name)
+    os.system(f'dot -Tpng {name} -o {name[:-4]}.png')
     return tree.score(X_test, y_test)
 
 
 if __name__ == '__main__':
     scores = []
     for i in range(50):
-        predicted, y_test, score = expelling_students_tree_learn()
-        scores.append(score)
+        predicted, X_test, y_test, tree = expelling_students_tree_learn()
+        scores.append(tree.score(X_test, y_test))
     print(scores)
     print(sum(sorted(scores)[5:])/(len(scores)-5))

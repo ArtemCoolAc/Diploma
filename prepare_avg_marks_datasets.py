@@ -1,11 +1,11 @@
 import os
 import json
+from new_transform_from_EIS import all_groups
 
-
-def merge_average_marks(groups):
+def merge_average_marks(groups, terms=6):
     frame = dict()
     for group in groups:
-        for i in range(6):
+        for i in range(terms):
             check_file = os.path.exists(f'jsons/Grades_json{group}_{i+1}.json')
             if check_file:
                 file = open(f'jsons/Grades_json{group}_{i+1}.json')
@@ -21,25 +21,26 @@ def merge_average_marks(groups):
     return frame
 
 
-def fulfill_frame(frame, append_correct=0.):
+def fulfill_frame(frame, append_correct=0., terms=6):
     corrected_frame = dict()
     for key, value in frame.items():
         corrected_frame[key] = list()
-        if value[-1][0] == 6 and len(value) != 6:
-            for i in range(6 - len(value)):
+        if value[-1][0] == terms and len(value) != terms:
+            for i in range(terms - len(value)):
                 corrected_frame[key].append(append_correct)
             for i in range(len(value)):
                 corrected_frame[key].append(value[i][1])
-        elif len(value) == 6:
-            for i in range(6):
+        elif len(value) == terms:
+            for i in range(terms):
                 corrected_frame[key].append(value[i][1])
-    true_frame = extract_unneccessary_data(corrected_frame)
+    true_frame = extract_unneccessary_data(corrected_frame, terms)
     return true_frame
 
-def extract_unneccessary_data(frame):
-    return {k: v for k, v in frame.items() if len(v) == 6}
+def extract_unneccessary_data(frame, terms=6):
+    return {k: v for k, v in frame.items() if len(v) == terms}
 
 
 if __name__ == '__main__':
-    j1 = merge_average_marks(['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513'])
+    groups = all_groups()
+    j1 = merge_average_marks(groups)
     j2 = fulfill_frame(j1)

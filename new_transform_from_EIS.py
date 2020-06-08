@@ -11,125 +11,148 @@ import os
 def analyze_one_term(group_name='Б16-503', term=1):
 
     name = f'new_svod/SvodSession_{group_name}_{term}.csv'
+    data_new = dict()
+    check_file = os.path.exists(name)
+    if check_file:
+        file = open(name, 'r')
+        for i in range(4): # deleting 4 first not necessary strings
+            file.readline()
+        reader = csv.reader(file, delimiter=',')  # read CSV
+        session = list()
 
-    file = open(name, 'r')
-    for i in range(4): # deleting 4 first not necessary strings
-        file.readline()
-    reader = csv.reader(file, delimiter=',')  # read CSV
-    session = list()
+        for line in reader:
+            if len(line) and line[-3] != '*' and line[-3] != '#7' and line[-3] != '#0' and line[-3] != '' and \
+            (line[-3] != 'а' or line[-1] != ''):  # * means that the subject wasn't chosen
+                session.append(line)  # read session in a huge list
 
-    for line in reader:
-        if len(line) and line[-3] != '*' and line[-3] != '#7' and line[-3] != '#0' and line[-3] != '' and \
-        (line[-3] != 'а' or line[-1] != ''):  # * means that the subject wasn't chosen
-            session.append(line)  # read session in a huge list
+        session.pop(0)
 
-    session.pop(0)
+        mapping = {'A': '5', 'B': '4', 'C': '4', 'D': '4', 'E': '3',
+                   'F': '2', '': '0', 'н/а': '0'}  # ECTS to mark
 
-    mapping = {'A': '5', 'B': '4', 'C': '4', 'D': '4', 'E': '3', '': '0', 'н/а': '0'}  # ECTS to mark
-    extra_mapping = {'н/а': '0'}
+        session_new = dict()
 
-    session_new = dict()
+        for line in session:
+            line[-2] = '0'
+            if len(line[-3]) > 1:  # if it is not 'a'
+                if line[-3] != 'н/а':
+                    if line[-3][-3:] == 'н/а' and len(line[-3]) > 3:
+                        line[-3] = '0'
+                    else:
+                        line[-3] = line[-3][-1]  # н-а->{mark}, => {mark}
+                line[-2] = '1'  # 0 - no-retake, 1 - retake
+            line[-2] = '1' if line[-1] == 'F' else line[-2]
+            if line[3] == 'Зачеты':
+                line[-3] = mapping[line[-1]]  # mapping pretest '3' to mark
+            # print(line)
+            line[-3] = '0' if line[-3] == 'н/а' or line[-3] == '' else line[-3]
+            line[-1] = 'F' if line[-1] == '' and line[-3] != 'а' else line[-1]
 
-    for line in session:
-        line[-2] = '0'
-        if len(line[-3]) > 1:  # if it is not 'a'
-            if line[-3] != 'н/а':
-                if line[-3][-3:] == 'н/а' and len(line[-3]) > 3:
-                    line[-3] = '0'
+        for line in session:
+            expultion_date = None
+            if 'отч' in line[2]:
+                splitted = line[2].split('отч')
+                line[2] = splitted[0]
+                expultion_date = splitted[1][2:]
+            line[2] = line[2][:-1].strip()
+            if line[2] not in session_new:  # add FIO to key of dict      
+                session_new[line[2]] = list()
+            session_new[line[2]].append(line)  # add subject to the list
+
+        for key, value in session_new.items():
+            """Transforming to dict with 
+            {FIO}->[{ECTS},{mark},{pretest_retake}, {exam_retake}, {CP_retake}, {other_retake}, {lists}]"""
+            local = dict()
+            local['ECTS'] = list()
+            local['mark'] = list()
+            local['pretest_retake'] = list()
+            local['exam_retake'] = list()
+            local['CP_retake'] = list()
+            local['other_retake'] = list()
+            local['lists'] = list()
+            local['expel'] = expultion_date
+            local['rest'] = 0 # debt
+            local['average'] = 0 # average student mark per term
+            local['100'] = list()
+            local['100_average'] = 0
+            for line in value:
+                local['ECTS'].append(line[-1]) if line[-1].strip() != '' else ''
+                local['mark'].append(line[-3])
+                if local['mark'][-1] == '6':
+                    local['mark'][-1] = '0'
+                mapping = {'0F': 0, '1F': 25, '2F': 50, '3E': 62, '3D': 66, '4D': 71, '4C': 80, '4B': 86, '5A': 92}
+                mark_id = f"{local['mark'][-1]}{local['ECTS'][-1]}"
+                if mark_id in mapping:
+                    local['100'].append(mapping[mark_id])
                 else:
-                    line[-3] = line[-3][-1]  # н-а->{mark}, => {mark}
-            line[-2] = '1'  # 0 - no-retake, 1 - retake
-        line[-2] = '1' if line[-1] == 'F' else line[-2]
-        if line[3] == 'Зачеты':
-            line[-3] = mapping[line[-1]]  # mapping pretest '3' to mark
-        # print(line)
-        line[-3] = '0' if line[-3] == 'н/а' or line[-3] == '' else line[-3]
-        line[-1] = 'F' if line[-1] == '' and line[-3] != 'а' else line[-1]
+                    local['100'].append(0)
+                local['lists'].append(line)
+                if line[-2] == '1':
+                    if line[3] == 'Зачеты':
+                        local['pretest_retake'].append((line[5], line[6], line[7]))
+                    elif line[3] == 'Экзамены':
+                        local['exam_retake'].append((line[5], line[6], line[7]))
+                    elif line[3] == 'КР/КП':
+                        local['CP_retake'].append((line[5], line[6], line[7]))
+                    else:
+                        local['other_retake'].append((line[5], line[6], line[7]))
+            b = list(filter(lambda x: x in ['2', '3', '4', '5'], local['mark']))
+            marks_list = list(filter(lambda x: x in ['0', '1', '2', '3', '4', '5'], local['mark']))
+            subjects_number = {1: 8, 2: 8, 3: 9, 4: 10, 5: 9, 6: 9}
+            true_length = subjects_number[term] if len(marks_list) else len(marks_list)
+            true_length = 10 if term == 5 and 'Б14' in group_name else true_length
+            true_length = 8 if term == 6 and 'Б13' in group_name else true_length
+            true_length = 9 if term == 4 and 'Б12' in group_name else true_length
+            local['average'] = round(sum(map(int, marks_list)) / true_length, 2)
+            local['100_average'] = round(sum(local['100']) / true_length)
 
-    for line in session:
-        expultion_date = None
-        if 'отч' in line[2]:
-            splitted = line[2].split('отч')
-            line[2] = splitted[0]
-            expultion_date = splitted[1][2:]
-        line[2] = line[2][:-1].strip()
-        if line[2] not in session_new:  # add FIO to key of dict      
-            session_new[line[2]] = list()
-        session_new[line[2]].append(line)  # add subject to the list
+            local['rest'] = abs(len(b) - len(local['mark']))
+            session_new[key] = local
 
-    for key, value in session_new.items():
-        """Transforming to dict with 
-        {FIO}->[{ECTS},{mark},{pretest_retake}, {exam_retake}, {CP_retake}, {other_retake}, {lists}]"""
-        local = dict()
-        local['ECTS'] = list()
-        local['mark'] = list()
-        local['pretest_retake'] = list()
-        local['exam_retake'] = list()
-        local['CP_retake'] = list()
-        local['other_retake'] = list()
-        local['lists'] = list()
-        local['expel'] = expultion_date
-        local['rest'] = 0 # debt
-        local['average'] = 0 # average student mark per term
-        local['100'] = list()
-        local['100_average'] = 0
-        for line in value:
-            local['ECTS'].append(line[-1]) if line[-1].strip() != '' else ''
-            local['mark'].append(line[-3])
-            if local['mark'][-1] == '6':
-                local['mark'][-1] = '0'
-            mapping = {'0F': 0, '1F': 25, '2F': 50, '3E': 62, '3D': 66, '4D': 71, '4C': 80, '4B': 86, '5A': 92}
-            mark_id = f"{local['mark'][-1]}{local['ECTS'][-1]}"
-            if mark_id in mapping:
-                local['100'].append(mapping[mark_id])
-            else:
-                local['100'].append(0)
-            local['lists'].append(line)
-            if line[-2] == '1':
-                if line[3] == 'Зачеты':
-                    local['pretest_retake'].append((line[5], line[6], line[7]))
-                elif line[3] == 'Экзамены':
-                    local['exam_retake'].append((line[5], line[6], line[7]))
-                elif line[3] == 'КР/КП':
-                    local['CP_retake'].append((line[5], line[6], line[7]))
-                else:
-                    local['other_retake'].append((line[5], line[6], line[7]))
-        b = list(filter(lambda x: x in ['2', '3', '4', '5'], local['mark']))
-        marks_list = list(filter(lambda x: x in ['0', '1', '2', '3', '4', '5'], local['mark']))
-        subjects_number = {1: 8, 2: 8, 3: 9, 4: 10, 5: 9, 6: 9}
-        true_length = subjects_number[term] if len(marks_list) else len(marks_list)
-        true_length = 10 if term == 5 and group_name not in ['Б16-503', 'Б16-513'] else true_length
-        local['average'] = round(sum(map(int, marks_list)) / true_length, 2)
-        local['100_average'] = round(sum(local['100']) / true_length)
+        data = dict()
 
-        local['rest'] = abs(len(b) - len(local['mark']))
-        session_new[key] = local
+        for key, value in session_new.items():
+            data[key] = dict()
+            for key2, value2 in value.items():
+                if key2 != 'lists':
+                    data[key][key2] = value2
+        data_new = copy.deepcopy(data)
+        for key, value in data_new.items():
+            if '' in value['ECTS']:
+                value['ECTS'] = list(filter(lambda a: a != '', value['ECTS']))
+            if 'а' in value['mark']:
+                value['mark'] = list(filter(lambda a: a != 'а', value['mark']))
+            if '' in value['mark']:
+                for i in range(len(value['mark'])):
+                    value['mark'][i] = '0'
+            value['mark'] = list(map(int, value['mark']))
 
-    data = dict()
+        with open(f'dicts/__Grades_dict{group_name}_{term}.txt', 'w') as file1:
+            file1.write(str(data_new))
 
-    for key, value in session_new.items():
-        data[key] = dict()
-        for key2, value2 in value.items():
-            if key2 != 'lists':
-                data[key][key2] = value2
-    data_new = copy.deepcopy(data)
-    for key, value in data_new.items():
-        if '' in value['ECTS']:
-            value['ECTS'] = list(filter(lambda a: a != '', value['ECTS']))
-        if 'а' in value['mark']:
-            value['mark'] = list(filter(lambda a: a != 'а', value['mark']))
-        if '' in value['mark']:
-            for i in range(len(value['mark'])):
-                value['mark'][i] = '0'
-        value['mark'] = list(map(int, value['mark']))
+        with open(f'jsons/Grades_json{group_name}_{term}.json', 'w') as file2:
+            json.dump(data_new, file2, ensure_ascii=False)
 
-    with open(f'dicts/__Grades_dict{group_name}_{term}.txt', 'w') as file1:
-        file1.write(str(data_new))
-
-    with open(f'jsons/Grades_json{group_name}_{term}.json', 'w') as file2:
-        json.dump(data_new, file2, ensure_ascii=False)
+        file.close()
 
     return data_new
+
+def all_groups():
+    return ['Б12-503', 'Б12-504', 'Б12-505',
+            'Б13-503', 'Б13-504', 'Б13-505',
+            'Б14-503', 'Б14-504',
+            'Б15-502',
+            'Б16-503', 'Б16-513']
+
+def analyze_all_terms(group):
+    for i in range(6):
+        analyze_one_term(group, i + 1)
+
+def analyze_groups(groups):
+    for group in groups:
+        analyze_all_terms(group)
+
+
 
 
 def draw_graph(group_name, term, feature='mark'):
@@ -212,10 +235,9 @@ def draw_and_save(title, bar_label, labels, values, directory):
 
 
 def draw_overall_graphs():
-    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    groups = all_groups()
     features = ['mark', 'retake', 'ECTS']
     labels = [a + 1 for a in range(6)]
-    # overall_stat = dict.fromkeys(features)
     overall_stat = {key: [] for key in features}
     for feature in features:
         average_values = list()
@@ -234,7 +256,7 @@ def draw_overall_graphs():
 
 
 def draw_all_terms_in_groups():
-    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    groups = all_groups()
     terms = [a + 1 for a in range(6)]
     features = ['mark', 'ECTS']
     for group in groups:
@@ -243,4 +265,5 @@ def draw_all_terms_in_groups():
                 draw_graph(group, term, feature)
 
 if __name__ == '__main__':
-    draw_overall_graphs()
+    analyze_groups(['Б12-503', 'Б12-504', 'Б12-505', 'Б13-503', 'Б13-504', 'Б13-505']) 
+    # draw_overall_graphs()

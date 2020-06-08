@@ -1,13 +1,14 @@
 import os
 import csv
 from prepare_avg_marks_datasets import fulfill_frame
+from new_transform_from_EIS import all_groups
 
 
 def merge_english_marks(groups):
     frame = dict()
     mapping = {'F': 0, 'E': 1, 'D': 2, 'C': 3, 'B': 4, 'A': 5}
     for group in groups:
-        for i in range(6):
+        for i in range(4):
             check_file = os.path.exists(f'new_svod/SvodSession_{group}_{i+1}.csv')
             if check_file:
                 file = open(f'new_svod/SvodSession_{group}_{i+1}.csv', 'r')
@@ -32,7 +33,8 @@ def merge_english_marks(groups):
 
 
 if __name__ == '__main__':
-    groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    # groups = ['Б14-503', 'Б14-504', 'Б15-502', 'Б16-503', 'Б16-513']
+    groups = all_groups()
     j1 = merge_english_marks(groups)
     j2 = fulfill_frame(j1, 0)
     print(j2)
